@@ -1,5 +1,5 @@
 library(tidyverse)
-install.packages('countrycode')
+#install.packages('countrycode')
 library(countrycode)
 data <- read_csv("master.csv")
 theme_set(theme_light()) #cause it'll look pretty 
@@ -51,3 +51,39 @@ tidy_data$generation <- factor(tidy_data$generation,
 
 tidy_data <- as_tibble(tidy_data)
 
+
+b<-tidy_data %>% group_by(continent) %>%
+  summarize(population = sum(population), 
+            suicides = sum(suicides_no), 
+            suicides_per_100k = (suicides / population) * 100000)
+
+ggplot(b, aes(continent,suicides_per_100k))+
+         geom_bar(stat = "identity")
+
+
+tidy_data %>% group_by(generation) %>%
+  summarize(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000
+  ) %>%
+  ggplot(aes(generation,suicides_per_100k))+geom_bar(stat = "identity")
+
+
+tidy_data %>% group_by(sex) %>%
+  summarize(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000
+  ) %>%
+  ggplot(aes(sex,suicides_per_100k))+geom_bar(stat = "identity")
+ 
+
+
+
+
+  
+  
+  
+  
+  
