@@ -1,0 +1,276 @@
+---
+title: "Suicide Rates Analysis(1985 to 2016)"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+#install.packages('countrycode')
+library(countrycode)
+
+theme_set(theme_light()) #cause it'll look pretty 
+```
+
+## Suicide Rates Overview 1985 to 2016
+
+**Data Source **
+United Nations Development Program. (2018). Human development index (HDI). Retrieved from <http://hdr.undp.org/en/indicators/137506>
+
+World Bank. (2018). World development indicators: GDP (current US$) by country:1985 to 2016. Retrieved from <http://databank.worldbank.org/data/source/world-development-indicators#>
+
+[Szamil]. (2017). Suicide in the Twenty-First Century [dataset]. Retrieved from <https://www.kaggle.com/szamil/suicide-in-the-twenty-first-century/notebook>
+
+World Health Organization. (2018). Suicide prevention. Retrieved from <http://www.who.int/mental_health/suicide-prevention/en/>
+
+```{r importing data, echo= TRUE}
+data <- read_csv("master.csv")
+```
+
+## Global Trend
+
+
+```{r pressure, echo=TRUE}
+#global trend
+a<-data %>%
+  group_by(year)%>%
+  mutate(sum_year=sum(`suicides/100k pop`))
+
+ggplot(a,aes(year,sum_year))+geom_line()+geom_point()+
+  geom_line(col = "deepskyblue3", size = 1) + 
+  geom_point(col = "deepskyblue3", size = 2) + 
+  labs(title = "Global Suicides (per 100k)",
+       subtitle = "Trend over time, 1985 - 2015.",
+       x = "Year", 
+       y = "Suicides per 100k") + 
+  scale_x_continuous(breaks = seq(1985, 2015, 2)) + 
+  scale_y_continuous(breaks = seq(10, 20))
+```
+
+
+**Insights**
+
+1. Globally the Suicide rate has dropped compared to 1985
+
+
+2. Suicide rate has gradually incereased from 1985 till 1995 where the global suicide rate was 
+   all time high.
+
+
+3. The Highest Drop at suicide rate was observed within 2015 and 2016 but this is observation might be incorrenct    due to lack of data points at that certain year.
+
+## Cleaning the Data
+Dropped the `suicides/100k pop` & `HDI for year` variable due to in efficient labeling.Furthermore some variables labling was renamed to make it more concise.
+```{r cleaning }
+tidy_data <-  data %>% 
+  select(-c(`HDI for year`, `suicides/100k pop`)) %>%
+  rename(gdp_for_year = `gdp_for_year ($)`, 
+         gdp_per_capita = `gdp_per_capita ($)`, 
+         country_year = `country-year`) %>%
+  as.data.frame()
+
+```
+
+
+
+### Adding Continent
+
+Added continent for each country in our observations via using the `countrycode` package.
+
+```{r adding continent}
+tidy_data$continent <- countrycode(sourcevar = tidy_data[, "country"],
+                              origin = "country.name",
+                              destination = "continent")
+
+```
+
+
+### Factoring the Colums 
+
+
+```{r }
+tidy_data$generation <- factor(tidy_data$generation, 
+                          ordered = T, 
+                          levels = c("G.I. Generation", 
+                                     "Silent",
+                                     "Boomers", 
+                                     "Generation X", 
+                                     "Millenials", 
+                                     "Generation Z"))
+
+tidy_data <- as_tibble(tidy_data)
+
+```
+
+
+## Suicides Per 100k in Each continent
+
+
+```{r }
+b<-tidy_data %>% group_by(continent) %>%
+  summarize(population = sum(population), 
+            suicides = sum(suicides_no), 
+            suicides_per_100k = (suicides / population) * 100000)
+
+ggplot(b, aes(continent,suicides_per_100k,fill=continent))+
+         geom_bar(stat = "identity")
+```
+
+
+
+
+**Insights**
+1. Europe has the highest rate of the Suicide.
+
+
+2. Africa has the lowest rate of suicide
+
+
+## Suicides per 100k in between each Generation
+
+
+```{r each generation, fig.height=8 ,fig.width=8}
+
+tidy_data %>% group_by(generation) %>%
+  summarize(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000
+  ) %>%
+  ggplot(aes(generation,suicides_per_100k,fill=generation))+geom_bar(stat = "identity")
+```
+
+
+## Suicide rates in male-female
+
+
+```{r }
+tidy_data %>% group_by(sex) %>%
+  summarize(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000
+  ) %>%
+  ggplot(aes(sex,suicides_per_100k,fill=sex))+geom_bar(stat = "identity")
+```
+
+
+## Trend over time, By Sex
+
+
+```{r }
+trend_sex<-tidy_data %>% 
+  group_by(year,sex) %>%
+  
+  summarise(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000
+  )
+
+ggplot(trend_sex,aes(year,suicides_per_100k,color=sex),)+
+  geom_line(size=1)+
+  geom_point(size=2)+
+  facet_wrap(~sex,nrow = 2,scales = 'free')+
+  labs(title = "Trends Over Time, by Sex", 
+       x = "Year", 
+       y = "Suicides per 100k", 
+       color = "Sex") + 
+  theme(legend.position = "none") + 
+  scale_x_continuous(breaks = seq(1985, 2015, 5), minor_breaks = F)
+```
+
+
+## Global Suicides per 100k, by Country
+
+
+```{r , fig.height=15,fig.width=8}
+country <- tidy_data %>%
+  group_by(country, continent) %>%
+  summarize(n = n(), 
+            suicide_per_100k = (sum(as.numeric(suicides_no)) / sum(as.numeric(population))) * 100000) %>%
+  arrange(desc(suicide_per_100k))
+
+country$country <- factor(country$country, 
+                          ordered = T, 
+                          levels = rev(country$country))
+
+ggplot(country, aes(x = country, y = suicide_per_100k, fill = continent)) + 
+  geom_bar(stat = "identity") + 
+  
+  labs(title = "Global suicides per 100k, by Country",
+       x = "Country", 
+       y = "Suicides per 100k", 
+       fill = "Continent") +
+  coord_flip() +
+  scale_y_continuous(breaks = seq(0, 45, 2)) + 
+  theme(legend.position = "bottom")
+```
+
+
+## GDP & Suicide Rate
+
+We see from our previous analysis that Suicide Rate in europian countries are High.So is there any corelation between a country's GDP and suicide rate? 
+Here each data point represents each country
+
+```{r }
+gdp_suicide_rate <- tidy_data %>%
+  group_by(country,continent)%>%
+  summarise(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000,
+    gdp_per_capita = mean(gdp_per_capita))
+
+
+gdp_suicide_rate<- gdp_suicide_rate %>% ungroup() %>%
+  arrange(desc(suicides_per_100k)) 
+
+
+ggplot(gdp_suicide_rate,aes(gdp_per_capita,suicides_per_100k,color=continent))+
+  geom_point(aes(alpha=0.01))+
+  geom_jitter()
+```
+It's Hard to see any trend with this scatter plot so we add a smooth line with `geom_smooth()`.
+
+```{r smooth line, echo=FALSE}
+gdp_suicide_rate_smooth <- tidy_data %>%
+  group_by(country)%>%
+  summarise(
+    population = sum(population), 
+    suicides = sum(suicides_no), 
+    suicides_per_100k = (suicides / population) * 100000,
+    gdp_per_capita = mean(gdp_per_capita))
+
+
+gdp_suicide_rate_smooth<- gdp_suicide_rate %>% ungroup() %>%
+  arrange(desc(suicides_per_100k)) 
+
+
+ggplot(gdp_suicide_rate_smooth,aes(gdp_per_capita,suicides_per_100k))+
+  geom_point(aes(alpha=0.01))+
+  geom_jitter()+
+  geom_smooth(method = "lm")
+
+```
+there's a slight positive corelation between the `gdp_per_capita` & `suicides_per_100k`
+
+## Let's look into Asia
+
+
+```{r}
+gdp_suicide_rate_asia<-gdp_suicide_rate %>%
+  filter(continent=="Asia")
+
+ggplot(gdp_suicide_rate_asia,aes(gdp_per_capita,suicides_per_100k,color="red"))+
+  geom_point(size=2)+
+  geom_jitter() +
+  geom_smooth(method = "lm")
+```
+Asia seems to have a negetive corelation between `gdp_per_capita` & `suicides_per_100k`
+
+
+
+
+
